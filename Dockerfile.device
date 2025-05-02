@@ -1,0 +1,11 @@
+FROM alpine:latest
+
+RUN apk update && apk add --no-cache socat iputils iperf3 netcat-openbsd
+
+COPY device-entrypoint.sh /usr/local/bin/device-entrypoint.sh
+RUN chmod +x /usr/local/bin/device-entrypoint.sh
+
+EXPOSE 5540
+
+ENTRYPOINT ["/usr/local/bin/device-entrypoint.sh"]
+CMD ["sh", "-c", "while true; do echo 'Mock device says hello' | socat - TCP-LISTEN:5540,reuseaddr; done"]

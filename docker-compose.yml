@@ -1,0 +1,76 @@
+services:
+  router:
+    build:
+      context: .
+      dockerfile: Dockerfile.router
+    container_name: router
+    privileged: true
+    networks:
+      admin_net:   { ipv4_address: 172.26.0.2 }
+      factory_net: { ipv4_address: 172.24.0.2 }
+      guest_net:   { ipv4_address: 172.25.0.2 }
+    volumes:
+      - ./router/scripts/reload-rules-ip:/usr/local/bin/reload-rules-ip:ro
+    command: ["/usr/local/bin/router-setup.sh"]
+  admin_device:
+    depends_on:
+      - router
+    build:
+      context: .
+      dockerfile: Dockerfile.device
+    cap_add: [ NET_ADMIN ]
+    environment:
+      - ZONE=admin
+      - ROUTER_ADMIN=172.26.0.2
+    networks:
+      - admin_net
+  factory_device:
+    depends_on:
+      - router
+    build:
+      context: .
+      dockerfile: Dockerfile.device
+    cap_add: [ NET_ADMIN ]
+    environment:
+      - ZONE=factory
+      - ROUTER_FACTORY=172.24.0.2
+    networks:
+      - factory_net
+  guest_device:
+    depends_on:
+      - router
+    build:
+      context: .
+      dockerfile: Dockerfile.device
+    cap_add: [ NET_ADMIN ]
+    environment:
+      - ZONE=guest
+      - ROUTER_GUEST=172.25.0.2
+    networks:
+      - guest_net
+
+networks:
+  admin_net:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.26.0.0/16
+          gateway: 172.26.0.1
+
+  factory_net:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.24.0.0/16
+          gateway: 172.24.0.1
+
+  guest_net:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.25.0.0/16
+          gateway: 172.25.0.1
+

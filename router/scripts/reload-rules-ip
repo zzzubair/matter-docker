@@ -1,0 +1,59 @@
+#!/bin/sh
+set -e
+
+
+ADMIN_NET="172.26.0.0/16"     # eth1 inside the router
+FACTORY_NET="172.24.0.0/16"   # eth2
+GUEST_NET="172.25.0.0/16"     # eth0
+
+
+PROFILE="$1"
+
+
+echo 1 > /proc/sys/net/ipv4/ip_forward     # make sure forwarding is on
+iptables -F FORWARD                        # flush rules
+iptables -Z FORWARD                        # zero counters
+
+
+case "$PROFILE" in
+
+  permissive)
+
+      iptables -P FORWARD ACCEPT
+      ;;
+
+  selective | selective_log)
+
+      iptables -P FORWARD DROP
+
+
+      iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+      for NET in "$ADMIN_NET" "$FACTORY_NET" "$GUEST_NET"; do
+          iptables -A FORWARD -s "$NET" -d "$NET" -j ACCEPT
+      done
+
+
+      iptables -A FORWARD -s "$ADMIN_NET"   -d "$FACTORY_NET" -j ACCEPT
+      iptables -A FORWARD -s "$ADMIN_NET"   -d "$GUEST_NET"   -j ACCEPT
+      iptables -A FORWARD -s "$FACTORY_NET" -d "$GUEST_NET"   -j ACCEPT
+
+      drop_rule() {
+          SRC=$1 DST=$2 TAG=$3
+          if [ "$PROFILE" = "selective_log" ]; then
+              iptables -A FORWARD -s "$SRC" -d "$DST" -j LOG \
+                       --log-prefix "[DROP $TAG] "
+          fi
+          iptables -A FORWARD -s "$SRC" -d "$DST" -j DROP
+      }
+      drop_rule "$FACTORY_NET" "$ADMIN_NET"   "factory→admin"
+      drop_rule "$GUEST_NET"   "$FACTORY_NET" "guest→factory"
+      drop_rule "$GUEST_NET"   "$ADMIN_NET"   "guest→admin"
+      ;;
+
+  *)
+      echo "reload-rules-ip: unknown profile '$PROFILE'" >&2
+      exit 1
+      ;;
+esac
+
+echo "Installed $PROFILE ruleset (CIDR matching)."

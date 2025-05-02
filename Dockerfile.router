@@ -1,0 +1,8 @@
+FROM alpine:latest
+
+RUN apk update && apk add --no-cache iptables iproute2
+
+COPY router-setup.sh /usr/local/bin/router-setup.sh
+RUN chmod +x /usr/local/bin/router-setup.sh
+
+CMD ["/usr/local/bin/router-setup.sh"]
